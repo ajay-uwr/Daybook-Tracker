@@ -140,15 +140,22 @@
 
       <div class="form-pad" id="tab-trainer-panel">
         <form onsubmit="return handleTrainerLogin(event)">
-          <label class="field">
+          <label class="field" id="name-select-field">
             <span class="field-label">Your name</span>
-            <input type="text" id="login-name" placeholder="e.g. Priya Nair" required />
+            <select id="login-name-select" onchange="onNameSelectChange()">
+              <option value="">Loading…</option>
+              <option value="__new__">➕ I'm new here</option>
+            </select>
+          </label>
+          <label class="field hidden" id="name-new-field">
+            <span class="field-label">Type your name (checked against the list above)</span>
+            <input type="text" id="login-name-new" placeholder="e.g. Priya Nair" />
           </label>
           <label class="field">
             <span class="field-label">Passcode</span>
             <input type="password" id="login-passcode" placeholder="Choose one the first time" required />
           </label>
-          <p class="hint-text" style="margin-bottom:12px;">First time here? Just pick a passcode now — it'll be remembered for next time.</p>
+          <p class="hint-text" style="margin-bottom:12px;">Pick your name from the list if you've logged in before — only choose "I'm new here" the very first time.</p>
           <div id="trainer-login-error" class="error-text hidden"></div>
           <button class="btn-primary" type="submit" id="trainer-login-btn">Continue</button>
         </form>
@@ -319,14 +326,57 @@ function switchLoginTab(tab) {
   document.getElementById("tab-admin-panel").classList.toggle("hidden", tab !== "admin");
 }
 
+let knownTrainerNames = [];
+
+async function loadTrainerNames() {
+  const sel = document.getElementById("login-name-select");
+  try {
+    const result = await apiGet("getTrainerNames");
+    knownTrainerNames = (result.names || []).slice().sort();
+  } catch (err) {
+    knownTrainerNames = [];
+  }
+  sel.innerHTML =
+    '<option value="">Select your name…</option>' +
+    knownTrainerNames.map(n => `<option value="${n}">${n}</option>`).join("") +
+    '<option value="__new__">➕ I\'m new here</option>';
+}
+
+function onNameSelectChange() {
+  const isNew = document.getElementById("login-name-select").value === "__new__";
+  document.getElementById("name-new-field").classList.toggle("hidden", !isNew);
+  if (isNew) document.getElementById("login-name-new").focus();
+}
+
 async function handleTrainerLogin(e) {
   e.preventDefault();
   if (!checkConfig()) return false;
-  const name = document.getElementById("login-name").value.trim();
-  const passcode = document.getElementById("login-passcode").value.trim();
   const errEl = document.getElementById("trainer-login-error");
   const btn = document.getElementById("trainer-login-btn");
   errEl.classList.add("hidden");
+
+  const selectVal = document.getElementById("login-name-select").value;
+  let name;
+  if (selectVal === "__new__") {
+    name = document.getElementById("login-name-new").value.trim();
+    if (!name) { errEl.textContent = "Type your name."; errEl.classList.remove("hidden"); return false; }
+    // Guard against accidentally re-registering someone already on the list
+    // (e.g. typed with different capitalization or spacing).
+    const collision = knownTrainerNames.find(n => n.toLowerCase() === name.toLowerCase());
+    if (collision) {
+      errEl.textContent = `"${collision}" is already on the list above — please select it instead of registering again.`;
+      errEl.classList.remove("hidden");
+      return false;
+    }
+  } else if (selectVal) {
+    name = selectVal;
+  } else {
+    errEl.textContent = "Select your name, or choose \"I'm new here\".";
+    errEl.classList.remove("hidden");
+    return false;
+  }
+
+  const passcode = document.getElementById("login-passcode").value.trim();
   btn.disabled = true; btn.textContent = "Checking…";
   try {
     const result = await apiPost({ action: "login", name, passcode });
@@ -371,6 +421,7 @@ async function handleAdminLogin(e) {
 function logout() {
   currentTrainer = null;
   showScreen("login");
+  loadTrainerNames();
 }
 
 function showScreen(name) {
@@ -626,6 +677,7 @@ function exportCSV() {
 // ================================================================
 checkConfig();
 document.getElementById("log-date") && (document.getElementById("log-date").max = new Date().toISOString().slice(0, 10));
+if (checkConfig()) loadTrainerNames();
 </script>
 </body>
 </html>
