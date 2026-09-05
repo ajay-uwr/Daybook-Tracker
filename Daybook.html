@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Daybook — Trainer Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --paper: #F6F1E7;
+    --card: #FFFDF8;
+    --ink: #20262B;
+    --ink-soft: #5B6560;
+    --green: #2F4B3C;
+    --green-soft: #3F6350;
+    --gold: #B9862E;
+    --rose: #B5574A;
+    --line: #DBD0B8;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  h1, h2, h3 { font-family: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif; margin: 0; }
+  .hidden { display: none !important; }
+  .center-screen {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .login-box { width: 100%; max-width: 420px; }
+  .brand { text-align: center; margin-bottom: 28px; }
+  .brand h1 { font-size: 2rem; color: var(--ink); }
+  .brand p { color: var(--ink-soft); font-size: 0.9rem; margin-top: 4px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  }
+  .tabs { display: flex; font-size: 0.9rem; }
+  .tab-btn {
+    flex: 1; padding: 12px 0; background: none; border: none; cursor: pointer;
+    color: var(--ink-soft); border-bottom: 1px solid var(--line); font-family: inherit;
+  }
+  .tab-btn.active { color: var(--green); font-weight: 600; border-bottom: 2px solid var(--green); }
+  .form-pad { padding: 24px; }
+  label.field { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; margin-bottom: 14px; }
+  label.field span.field-label { color: var(--ink-soft); }
+  input, select {
+    border: 1px solid var(--line); border-radius: 6px; padding: 9px 10px; font-size: 0.9rem;
+    background: #fff; color: var(--ink); font-family: inherit; width: 100%;
+  }
+  .btn-primary {
+    background: var(--green); color: var(--paper); border: none; border-radius: 6px;
+    padding: 10px 18px; font-size: 0.9rem; cursor: pointer; font-family: inherit;
+  }
+  .btn-primary:hover { opacity: 0.9; }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-outline {
+    background: none; border: 1px solid var(--line); border-radius: 6px; padding: 9px 14px;
+    font-size: 0.85rem; cursor: pointer; color: var(--ink-soft); font-family: inherit;
+  }
+  .link-btn { background: none; border: none; color: var(--ink-soft); cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; }
+  .error-text { color: var(--rose); font-size: 0.85rem; margin: 8px 0; }
+  .success-text { color: var(--green-soft); font-size: 0.85rem; }
+  .hint-text { color: var(--ink-soft); font-size: 0.78rem; }
+
+  header.app-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 24px; border-bottom: 1px solid var(--line);
+  }
+  header.app-header .brand-mini { display: flex; align-items: center; gap: 8px; font-size: 1.15rem; }
+  main.app-main { max-width: 1100px; margin: 0 auto; padding: 28px 20px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+  th { text-align: left; font-weight: 400; color: var(--ink-soft); padding: 8px 12px; }
+  th.num, td.num { text-align: right; }
+  td { padding: 8px 12px; border-top: 1px solid var(--line); }
+  .empty-note { padding: 24px; color: var(--ink-soft); font-size: 0.9rem; }
+
+  .badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.75rem; color: #fff; }
+  .badge.under { background: var(--rose); }
+  .badge.proper { background: var(--green); }
+  .badge.over { background: var(--gold); }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+  @media (max-width: 720px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+  .stat-card { padding: 14px 16px; }
+  .stat-label { font-size: 0.75rem; color: var(--ink-soft); }
+  .stat-value { font-size: 1.5rem; margin-top: 2px; }
+  .stat-sub { font-size: 0.72rem; color: var(--ink-soft); margin-top: 2px; }
+
+  .filter-bar { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; margin-bottom: 20px; }
+  .filter-bar label.field { margin-bottom: 0; min-width: 140px; }
+
+  .chart-panel { padding: 16px; margin-bottom: 16px; }
+  .chart-panel h3 { font-size: 0.85rem; font-weight: 400; color: var(--ink-soft); font-family: inherit; margin-bottom: 10px; }
+  canvas { max-height: 260px; }
+
+  .section-title { font-size: 0.85rem; color: var(--ink-soft); margin: 20px 0 10px; }
+  .config-banner {
+    background: var(--rose); color: #fff; padding: 10px 16px; font-size: 0.85rem; text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================= -->
+<!-- CONFIG — paste your deployed Apps Script Web App URL below    -->
+<!-- ============================================================= -->
+<script>
+  const CONFIG = {
+    WEB_APP_URL: "https://script.google.com/macros/s/AKfycby4AdwwWocRMb16sK_q7IkxJKlNbZpho0EbzyjSLY6NyfBqF0XOVbpQKWhFf0UmO-SJ/exec"
+  };
+  // Thresholds for the utilization classification (in hours out of an 8-hour day).
+  const UTIL = {
+    WORKDAY_HOURS: 8,
+    UNDER_MAX: 5,   // below this = under-utilized
+    OVER_MIN: 7.5   // above this = over-utilized
+  };
+</script>
+
+<div id="config-banner" class="config-banner hidden">
+  ⚠ Set your Apps Script URL in CONFIG.WEB_APP_URL near the top of this file before using this app.
+</div>
+
+<!-- ============================ LOGIN ============================ -->
+<div id="screen-login" class="center-screen">
+  <div class="login-box">
+    <div class="brand">
+      <h1>📖 Daybook</h1>
+      <p>Daily hours, clearly kept.</p>
+    </div>
+    <div class="card">
+      <div class="tabs">
+        <button class="tab-btn active" id="tab-trainer-btn" onclick="switchLoginTab('trainer')">Trainer</button>
+        <button class="tab-btn" id="tab-admin-btn" onclick="switchLoginTab('admin')">Admin</button>
+      </div>
+
+      <div class="form-pad" id="tab-trainer-panel">
+        <form onsubmit="return handleTrainerLogin(event)">
+          <label class="field">
+            <span class="field-label">Your name</span>
+            <input type="text" id="login-name" placeholder="e.g. Priya Nair" required />
+          </label>
+          <label class="field">
+            <span class="field-label">Passcode</span>
+            <input type="password" id="login-passcode" placeholder="Choose one the first time" required />
+          </label>
+          <p class="hint-text" style="margin-bottom:12px;">First time here? Just pick a passcode now — it'll be remembered for next time.</p>
+          <div id="trainer-login-error" class="error-text hidden"></div>
+          <button class="btn-primary" type="submit" id="trainer-login-btn">Continue</button>
+        </form>
+      </div>
+
+      <div class="form-pad hidden" id="tab-admin-panel">
+        <form onsubmit="return handleAdminLogin(event)">
+          <label class="field">
+            <span class="field-label">Admin passcode</span>
+            <input type="password" id="admin-passcode" required />
+          </label>
+          <div id="admin-login-error" class="error-text hidden"></div>
+          <button class="btn-primary" type="submit">Enter admin view</button>
+        </form>
+      </div>
+    </div>
+    <p class="hint-text" style="text-align:center; margin-top:18px;">
+      Entries are shared across everyone using this Daybook — admins can see all trainers' logs.
+    </p>
+  </div>
+</div>
+
+<!-- ============================ TRAINER ============================ -->
+<div id="screen-trainer" class="hidden">
+  <header class="app-header">
+    <div class="brand-mini">📖 <strong>Daybook</strong></div>
+    <div style="display:flex; align-items:center; gap:16px;">
+      <span id="trainer-name-display" class="hint-text"></span>
+      <button class="link-btn" onclick="logout()">Log out</button>
+    </div>
+  </header>
+  <main class="app-main" style="max-width: 760px;">
+    <div class="card" style="padding:24px; margin-bottom:28px;">
+      <h2 style="font-size:1.15rem; margin-bottom:16px;">Log your day</h2>
+      <form onsubmit="return handleSaveLog(event)">
+        <label class="field">
+          <span class="field-label">Date</span>
+          <input type="date" id="log-date" required />
+        </label>
+        <div class="grid-2">
+          <label class="field"><span class="field-label">Hours in school</span><input type="number" min="0" step="0.25" id="f-schoolHours" placeholder="0" /></label>
+          <label class="field"><span class="field-label">Break taken (minutes)</span><input type="number" min="0" step="5" id="f-breakMinutes" placeholder="0" /></label>
+          <label class="field"><span class="field-label">Hours of session taken at school</span><input type="number" min="0" step="0.25" id="f-sessionSchoolHours" placeholder="0" /></label>
+          <label class="field"><span class="field-label">Hours of sessions taken online</span><input type="number" min="0" step="0.25" id="f-sessionOnlineHours" placeholder="0" /></label>
+          <label class="field"><span class="field-label">Hours shadowing other trainers online</span><input type="number" min="0" step="0.25" id="f-shadowingHours" placeholder="0" /></label>
+          <label class="field"><span class="field-label">Other assignments (hours)</span><input type="number" min="0" step="0.25" id="f-otherAssignmentHours" placeholder="0" /></label>
+        </div>
+        <label class="field">
+          <span class="field-label">Remarks for other assignments (what was it?)</span>
+          <input type="text" id="f-otherAssignmentRemarks" placeholder="e.g. Record correction for Grade 8 batch" />
+        </label>
+        <div style="display:flex; align-items:center; gap:12px; margin-top:6px;">
+          <button class="btn-primary" type="submit" id="save-log-btn">Save log</button>
+          <span id="save-log-success" class="success-text hidden">✓ Saved</span>
+        </div>
+      </form>
+    </div>
+
+    <h3 class="section-title">Your recent entries</h3>
+    <div class="card" id="trainer-history-wrap"></div>
+  </main>
+</div>
+
+<!-- ============================ ADMIN ============================ -->
+<div id="screen-admin" class="hidden">
+  <header class="app-header">
+    <div class="brand-mini">🛡 <strong>Daybook — Admin</strong></div>
+    <button class="link-btn" onclick="logout()">Log out</button>
+  </header>
+  <main class="app-main">
+    <div class="filter-bar">
+      <label class="field">
+        <span class="field-label">View by</span>
+        <select id="filter-period" onchange="renderAdmin()">
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+          <option value="yearly">Yearly</option>
+        </select>
+      </label>
+      <label class="field">
+        <span class="field-label">Trainer</span>
+        <select id="filter-trainer" onchange="renderAdmin()"><option value="all">All trainers</option></select>
+      </label>
+      <label class="field">
+        <span class="field-label">From</span>
+        <input type="date" id="filter-from" onchange="renderAdmin()" />
+      </label>
+      <label class="field">
+        <span class="field-label">To</span>
+        <input type="date" id="filter-to" onchange="renderAdmin()" />
+      </label>
+      <button class="btn-outline" onclick="exportCSV()">⬇ Export CSV</button>
+    </div>
+
+    <div class="stat-grid">
+      <div class="card stat-card"><div class="stat-label">Trainers</div><div class="stat-value" id="stat-trainers">0</div></div>
+      <div class="card stat-card"><div class="stat-label">Under-utilized days</div><div class="stat-value" id="stat-under">0</div></div>
+      <div class="card stat-card"><div class="stat-label">Properly utilized days</div><div class="stat-value" id="stat-proper">0</div></div>
+      <div class="card stat-card"><div class="stat-label">Over-utilized days</div><div class="stat-value" id="stat-over">0</div></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card chart-panel"><h3>Productive hours by trainer</h3><canvas id="chart-hours"></canvas></div>
+      <div class="card chart-panel"><h3>Utilization % by trainer</h3><canvas id="chart-util"></canvas></div>
+    </div>
+    <div class="card chart-panel"><h3>Trend over time</h3><canvas id="chart-trend"></canvas></div>
+
+    <h3 class="section-title" id="table-title">All entries</h3>
+    <div class="card" id="admin-table-wrap" style="overflow-x:auto;"></div>
+  </main>
+</div>
+
+<script>
+// ================================================================
+// STATE
+// ================================================================
+let currentTrainer = null;
+let allLogs = [];
+let charts = {};
+
+// ================================================================
+// API HELPERS
+// ================================================================
+async function apiGet(action, params) {
+  const url = new URL(CONFIG.WEB_APP_URL);
+  url.searchParams.set("action", action);
+  if (params) Object.keys(params).forEach(k => url.searchParams.set(k, params[k]));
+  const res = await fetch(url);
+  return res.json();
+}
+async function apiPost(payload) {
+  const res = await fetch(CONFIG.WEB_APP_URL, { method: "POST", body: JSON.stringify(payload) });
+  return res.json();
+}
+
+function checkConfig() {
+  if (!CONFIG.WEB_APP_URL || CONFIG.WEB_APP_URL.indexOf("PASTE_YOUR") === 0) {
+    document.getElementById("config-banner").classList.remove("hidden");
+    return false;
+  }
+  return true;
+}
+
+// ================================================================
+// UTILIZATION LOGIC
+// ================================================================
+function productiveHours(log) {
+  return (Number(log.SessionSchoolHours) || 0) + (Number(log.SessionOnlineHours) || 0) +
+         (Number(log.ShadowingHours) || 0) + (Number(log.OtherAssignmentHours) || 0);
+}
+function utilizationBand(hours) {
+  if (hours < UTIL.UNDER_MAX) return "under";
+  if (hours > UTIL.OVER_MIN) return "over";
+  return "proper";
+}
+function bandLabel(band) {
+  return band === "under" ? "Under-utilized" : band === "over" ? "Over-utilized" : "Properly utilized";
+}
+
+// ================================================================
+// LOGIN
+// ================================================================
+function switchLoginTab(tab) {
+  document.getElementById("tab-trainer-btn").classList.toggle("active", tab === "trainer");
+  document.getElementById("tab-admin-btn").classList.toggle("active", tab === "admin");
+  document.getElementById("tab-trainer-panel").classList.toggle("hidden", tab !== "trainer");
+  document.getElementById("tab-admin-panel").classList.toggle("hidden", tab !== "admin");
+}
+
+async function handleTrainerLogin(e) {
+  e.preventDefault();
+  if (!checkConfig()) return false;
+  const name = document.getElementById("login-name").value.trim();
+  const passcode = document.getElementById("login-passcode").value.trim();
+  const errEl = document.getElementById("trainer-login-error");
+  const btn = document.getElementById("trainer-login-btn");
+  errEl.classList.add("hidden");
+  btn.disabled = true; btn.textContent = "Checking…";
+  try {
+    const result = await apiPost({ action: "login", name, passcode });
+    if (result.status === "ok") {
+      currentTrainer = result.name;
+      await loadAllLogs();
+      showScreen("trainer");
+    } else {
+      errEl.textContent = result.message || "Login failed.";
+      errEl.classList.remove("hidden");
+    }
+  } catch (err) {
+    errEl.textContent = "Could not reach the server. Check the Apps Script URL and your connection.";
+    errEl.classList.remove("hidden");
+  }
+  btn.disabled = false; btn.textContent = "Continue";
+  return false;
+}
+
+async function handleAdminLogin(e) {
+  e.preventDefault();
+  if (!checkConfig()) return false;
+  const passcode = document.getElementById("admin-passcode").value.trim();
+  const errEl = document.getElementById("admin-login-error");
+  errEl.classList.add("hidden");
+  try {
+    const result = await apiPost({ action: "adminLogin", passcode });
+    if (result.status === "ok") {
+      await loadAllLogs();
+      showScreen("admin");
+    } else {
+      errEl.textContent = result.message || "Incorrect passcode.";
+      errEl.classList.remove("hidden");
+    }
+  } catch (err) {
+    errEl.textContent = "Could not reach the server. Check the Apps Script URL and your connection.";
+    errEl.classList.remove("hidden");
+  }
+  return false;
+}
+
+function logout() {
+  currentTrainer = null;
+  showScreen("login");
+}
+
+function showScreen(name) {
+  ["login", "trainer", "admin"].forEach(s => document.getElementById("screen-" + s).classList.toggle("hidden", s !== name));
+  if (name === "trainer") {
+    document.getElementById("trainer-name-display").textContent = currentTrainer;
+    document.getElementById("log-date").value = new Date().toISOString().slice(0, 10);
+    renderTrainerHistory();
+  }
+  if (name === "admin") {
+    populateTrainerFilter();
+    renderAdmin();
+  }
+}
+
+// ================================================================
+// DATA LOADING
+// ================================================================
+async function loadAllLogs() {
+  const result = await apiGet("getLogs");
+  allLogs = (result.logs || []).map(l => ({
+    trainer: l.Trainer, date: l.Date,
+    schoolHours: Number(l.SchoolHours) || 0,
+    breakMinutes: Number(l.BreakMinutes) || 0,
+    sessionSchoolHours: Number(l.SessionSchoolHours) || 0,
+    sessionOnlineHours: Number(l.SessionOnlineHours) || 0,
+    shadowingHours: Number(l.ShadowingHours) || 0,
+    otherAssignmentHours: Number(l.OtherAssignmentHours) || 0,
+    otherAssignmentRemarks: l.OtherAssignmentRemarks || ""
+  }));
+}
+
+// ================================================================
+// TRAINER DASHBOARD
+// ================================================================
+async function handleSaveLog(e) {
+  e.preventDefault();
+  const btn = document.getElementById("save-log-btn");
+  const success = document.getElementById("save-log-success");
+  btn.disabled = true; btn.textContent = "Saving…";
+  const payload = {
+    action: "saveLog",
+    trainer: currentTrainer,
+    date: document.getElementById("log-date").value,
+    schoolHours: document.getElementById("f-schoolHours").value || 0,
+    breakMinutes: document.getElementById("f-breakMinutes").value || 0,
+    sessionSchoolHours: document.getElementById("f-sessionSchoolHours").value || 0,
+    sessionOnlineHours: document.getElementById("f-sessionOnlineHours").value || 0,
+    shadowingHours: document.getElementById("f-shadowingHours").value || 0,
+    otherAssignmentHours: document.getElementById("f-otherAssignmentHours").value || 0,
+    otherAssignmentRemarks: document.getElementById("f-otherAssignmentRemarks").value || ""
+  };
+  try {
+    await apiPost(payload);
+    await loadAllLogs();
+    renderTrainerHistory();
+    success.classList.remove("hidden");
+    setTimeout(() => success.classList.add("hidden"), 2500);
+  } catch (err) {
+    alert("Could not save your log. Please check your connection and try again.");
+  }
+  btn.disabled = false; btn.textContent = "Save log";
+  return false;
+}
+
+function renderTrainerHistory() {
+  const mine = allLogs.filter(l => l.trainer === currentTrainer).sort((a, b) => a.date < b.date ? 1 : -1);
+  const wrap = document.getElementById("trainer-history-wrap");
+  if (mine.length === 0) {
+    wrap.innerHTML = '<p class="empty-note">No entries yet — add your first one above.</p>';
+    return;
+  }
+  let rows = mine.map(l => {
+    const hrs = productiveHours(l);
+    const band = utilizationBand(hrs);
+    return `<tr>
+      <td>${l.date}</td>
+      <td class="num">${hrs.toFixed(2)}h</td>
+      <td><span class="badge ${band}">${bandLabel(band)}</span></td>
+      <td class="num">${l.sessionSchoolHours}h</td>
+      <td class="num">${l.sessionOnlineHours}h</td>
+      <td class="num">${l.shadowingHours}h</td>
+      <td class="num">${l.otherAssignmentHours}h</td>
+    </tr>`;
+  }).join("");
+  wrap.innerHTML = `<table>
+    <thead><tr><th>Date</th><th class="num">Productive</th><th>Status</th><th class="num">School</th><th class="num">Online</th><th class="num">Shadowing</th><th class="num">Other</th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+// ================================================================
+// ADMIN DASHBOARD
+// ================================================================
+function populateTrainerFilter() {
+  const names = [...new Set(allLogs.map(l => l.trainer))].sort();
+  const sel = document.getElementById("filter-trainer");
+  const current = sel.value;
+  sel.innerHTML = '<option value="all">All trainers</option>' + names.map(n => `<option value="${n}">${n}</option>`).join("");
+  sel.value = names.includes(current) ? current : "all";
+}
+
+function isoWeek(dateStr) {
+  const d = new Date(dateStr + "T00:00:00");
+  const target = new Date(d.valueOf());
+  const dayNr = (d.getDay() + 6) % 7;
+  target.setDate(target.getDate() - dayNr + 3);
+  const firstThursday = target.valueOf();
+  target.setMonth(0, 1);
+  if (target.getDay() !== 4) target.setMonth(0, 1 + ((4 - target.getDay()) + 7) % 7);
+  const week = 1 + Math.round((firstThursday - target.valueOf()) / (7 * 86400000));
+  return d.getFullYear() + "-W" + String(week).padStart(2, "0");
+}
+function bucketKey(dateStr, period) {
+  if (period === "weekly") return isoWeek(dateStr);
+  if (period === "monthly") return dateStr.slice(0, 7);
+  if (period === "yearly") return dateStr.slice(0, 4);
+  return dateStr;
+}
+
+function getFilteredLogs() {
+  const trainerFilter = document.getElementById("filter-trainer").value;
+  const from = document.getElementById("filter-from").value;
+  const to = document.getElementById("filter-to").value;
+  return allLogs.filter(l =>
+    (trainerFilter === "all" || l.trainer === trainerFilter) &&
+    (!from || l.date >= from) && (!to || l.date <= to)
+  );
+}
+
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function renderAdmin() {
+  const period = document.getElementById("filter-period").value;
+  const filtered = getFilteredLogs();
+
+  // Stats
+  const trainerNames = [...new Set(allLogs.map(l => l.trainer))];
+  let under = 0, proper = 0, over = 0;
+  filtered.forEach(l => {
+    const band = utilizationBand(productiveHours(l));
+    if (band === "under") under++; else if (band === "over") over++; else proper++;
+  });
+  document.getElementById("stat-trainers").textContent = trainerNames.length;
+  document.getElementById("stat-under").textContent = under;
+  document.getElementById("stat-proper").textContent = proper;
+  document.getElementById("stat-over").textContent = over;
+
+  // By-trainer aggregation
+  const byTrainer = {};
+  filtered.forEach(l => {
+    byTrainer[l.trainer] = byTrainer[l.trainer] || { school: 0, online: 0, shadow: 0, other: 0, days: 0 };
+    const t = byTrainer[l.trainer];
+    t.school += l.sessionSchoolHours; t.online += l.sessionOnlineHours;
+    t.shadow += l.shadowingHours; t.other += l.otherAssignmentHours; t.days += 1;
+  });
+  const trainerLabels = Object.keys(byTrainer);
+
+  destroyChart("hours");
+  charts.hours = new Chart(document.getElementById("chart-hours"), {
+    type: "bar",
+    data: {
+      labels: trainerLabels,
+      datasets: [
+        { label: "School sessions", data: trainerLabels.map(t => byTrainer[t].school), backgroundColor: "#2F4B3C" },
+        { label: "Online sessions", data: trainerLabels.map(t => byTrainer[t].online), backgroundColor: "#B9862E" },
+        { label: "Shadowing", data: trainerLabels.map(t => byTrainer[t].shadow), backgroundColor: "#8E9E93" },
+        { label: "Other assignments", data: trainerLabels.map(t => byTrainer[t].other), backgroundColor: "#B5574A" }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } } }
+  });
+
+  destroyChart("util");
+  const utilData = trainerLabels.map(t => {
+    const total = byTrainer[t].school + byTrainer[t].online + byTrainer[t].shadow + byTrainer[t].other;
+    const avgPerDay = byTrainer[t].days > 0 ? total / byTrainer[t].days : 0;
+    return Math.round((avgPerDay / UTIL.WORKDAY_HOURS) * 100);
+  });
+  charts.util = new Chart(document.getElementById("chart-util"), {
+    type: "bar",
+    data: { labels: trainerLabels, datasets: [{ label: "Utilization %", data: utilData,
+      backgroundColor: utilData.map(pct => {
+        const hrs = (pct / 100) * UTIL.WORKDAY_HOURS;
+        const band = utilizationBand(hrs);
+        return band === "under" ? "#B5574A" : band === "over" ? "#B9862E" : "#2F4B3C";
+      }) }] },
+    options: { responsive: true, maintainAspectRatio: false, scales: { y: { max: 100 } } }
+  });
+
+  // Trend
+  const trendMap = {};
+  filtered.forEach(l => {
+    const k = bucketKey(l.date, period);
+    trendMap[k] = trendMap[k] || 0;
+    trendMap[k] += productiveHours(l);
+  });
+  const trendKeys = Object.keys(trendMap).sort();
+  destroyChart("trend");
+  charts.trend = new Chart(document.getElementById("chart-trend"), {
+    type: "line",
+    data: { labels: trendKeys, datasets: [{ label: "Total productive hours", data: trendKeys.map(k => trendMap[k]),
+      borderColor: "#2F4B3C", backgroundColor: "#2F4B3C", tension: 0.25 }] },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+
+  // Table
+  document.getElementById("table-title").textContent = `All entries (${filtered.length})`;
+  const wrap = document.getElementById("admin-table-wrap");
+  if (filtered.length === 0) {
+    wrap.innerHTML = '<p class="empty-note">No entries match these filters.</p>';
+    return;
+  }
+  const sorted = filtered.slice().sort((a, b) => a.date < b.date ? 1 : -1);
+  const rows = sorted.map(l => {
+    const hrs = productiveHours(l);
+    const band = utilizationBand(hrs);
+    return `<tr>
+      <td>${l.trainer}</td><td>${l.date}</td>
+      <td class="num">${hrs.toFixed(2)}h</td>
+      <td><span class="badge ${band}">${bandLabel(band)}</span></td>
+      <td class="num">${l.schoolHours}h</td><td class="num">${l.breakMinutes}m</td>
+      <td class="num">${l.sessionSchoolHours}h</td><td class="num">${l.sessionOnlineHours}h</td>
+      <td class="num">${l.shadowingHours}h</td><td class="num">${l.otherAssignmentHours}h</td>
+      <td>${l.otherAssignmentRemarks || ""}</td>
+    </tr>`;
+  }).join("");
+  wrap.innerHTML = `<table><thead><tr>
+    <th>Trainer</th><th>Date</th><th class="num">Productive</th><th>Status</th>
+    <th class="num">School</th><th class="num">Break</th><th class="num">Session-School</th>
+    <th class="num">Session-Online</th><th class="num">Shadowing</th><th class="num">Other</th><th>Remarks</th>
+  </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function exportCSV() {
+  const filtered = getFilteredLogs();
+  const header = "Trainer,Date,ProductiveHours,Status,SchoolHours,BreakMinutes,SessionSchoolHours,SessionOnlineHours,ShadowingHours,OtherAssignmentHours,Remarks\n";
+  const rows = filtered.map(l => {
+    const hrs = productiveHours(l);
+    const band = bandLabel(utilizationBand(hrs));
+    return [l.trainer, l.date, hrs.toFixed(2), band, l.schoolHours, l.breakMinutes,
+      l.sessionSchoolHours, l.sessionOnlineHours, l.shadowingHours, l.otherAssignmentHours,
+      '"' + (l.otherAssignmentRemarks || "").replace(/"/g, '""') + '"'].join(",");
+  }).join("\n");
+  const blob = new Blob([header + rows], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "daybook-logs.csv"; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ================================================================
+// INIT
+// ================================================================
+checkConfig();
+document.getElementById("log-date") && (document.getElementById("log-date").max = new Date().toISOString().slice(0, 10));
+</script>
+</body>
+</html>
